@@ -40,7 +40,7 @@ home.post("/home/newGame", (req, res, next) => {
     // } else {
     // }
   }
-  newGameSetUp();
+  newGameSetUp(Number(req.body.cards));
   res.redirect("/home");
   res.end();
 });
@@ -124,7 +124,6 @@ const clearSuccession = async login => {
     }
   );
   const interval = setInterval(() => {
-    console.log(id);
     if (id !== undefined) {
       clearInterval(interval);
       connection.query(
@@ -134,7 +133,6 @@ const clearSuccession = async login => {
           if (err) {
             console.log(err);
           }
-          console.log(res);
         }
       );
     }
@@ -151,20 +149,54 @@ const clearSuccession = async login => {
   );
 };
 
-const newGameSetUp = () => {
+const newGameSetUp = async numberOfCards => {
   connection.query(
-    "SELECT login FROM users WHERE succession > 0",
-    (err, res, fields) => {
+    "SELECT id,login,succession FROM users WHERE succession > 0",
+    (err, resLogin, fields) => {
       if (err) {
         console.log(err);
       }
-      numberOfPlayers = res.length;
-      master = res[0].login;
+      numberOfPlayers = resLogin.length;
+      master = resLogin[0].succession;
 
-      for (let i = 0; i < numberOfPlayers; i++) {
-        connection;
-        console.log(res[i].login);
+      // for each user
+      for (let j = 0; j < resLogin.length; j++) {
+        setTimeout(() => {
+          connection.query(
+            "SELECT * FROM whitecards WHERE free = ? ORDER BY RAND() LIMIT  ?",
+            [1, numberOfCards],
+            (err, resCards, fields) => {
+              if (err) {
+                console.log(err);
+              }
+
+              for (let i = 0; i < resCards.length; i++) {
+                connection.query(
+                  "UPDATE whitecards SET free = ? WHERE id = ?",
+                  [0, resCards[i].id],
+                  (err, res) => {
+                    if (err) {
+                      console.log(err);
+                    }
+                  }
+                );
+
+                connection.query(
+                  "INSERT INTO distribution (login,whitecard) VALUES ( ? , ? )",
+                  [resLogin[j].id, resCards[i].id],
+                  (err, res) => {
+                    if (err) {
+                      console.log(err);
+                    }
+                  }
+                );
+              }
+            }
+          );
+        }, 100 * j);
       }
     }
   );
 };
+
+const nextRound = () => {};
