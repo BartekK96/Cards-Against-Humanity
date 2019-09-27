@@ -1,0 +1,26 @@
+{
+  "name": "cards-against-humanity",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BartekK96/Cards-Against-Humanity.git"
+  },
+  "author": "Bartek",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BartekK96/Cards-Against-Humanity/issues"
+  },
+  "homepage": "https://github.com/BartekK96/Cards-Against-Humanity#readme",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "express-session": "^1.16.2",
+    "mysql": "^2.17.1",
+    "socket.io": "^2.3.0"
+  }
+}
