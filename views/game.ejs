@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <!-- bootstrap -->
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    />
+    <!-- scoket -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <title>Home</title>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand navbar-dark bg-dark">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="/home"
+            >Home <span class="sr-only">(current)</span></a
+          >
+        </li>
+
+        <li class="nav-item">
+          <a href="/home/newGame" class="nav-link">New Game</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a href="/home/logout" class="pr nav-link">Logout</a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="card border border-dark m-2" id="blackCard">
+      <!-- <div class="card-body">
+        <p class="card-text">
+          Lorem ipsum dolor sit, amet consectetur adipisicing elit. Aperiam
+          dolorem ex aliquid quis odit reiciendis eius suscipit velit ullam
+          voluptates quam sunt cum possimus, provident quae dignissimos
+          consectetur nemo atque?
+        </p>
+      </div> -->
+    </div>
+
+    <div class="container">
+      <div class="row" id="allWhiteCards">
+        <!-- <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div> -->
+      </div>
+    </div>
+    <div class="container text-center">
+      <h2>YOUR CARDS</h2>
+      <div class="row" id="allYourCards">
+        <!-- <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div>
+        <div class="col-sm card border border-dark m-2">
+          Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
+          ad neque pariatur alias sint eius porro facilis, similique non
+          delectus ratione distinctio reprehenderit laboriosam eligendi. Sunt
+          ipsum nemo id odio.
+        </div> -->
+      </div>
+    </div>
+
+    <div class="container text-center">
+      USERS POINTS
+      <div id="users"></div>
+    </div>
+
+    <div>Welcome <%= user %></div>
+    <script>
+      let id = <%= user %>
+    </script>
+    <script src="./javascript//game.js"></script>
+  </body>
+</html>

@@ -1,14 +1,24 @@
 const express = require("express");
 const home = express.Router();
 var path = require("path");
+//DB connection
 const connection = require("../config/mysql-connection");
 
 //game setup
 let numberOfPlayers;
 let master;
+let gameStarted = false;
+let player;
 
-home.get("/home", (req, res, next) => {
-  if (req.session.loggedin) {
+//routing
+home.get("/", (req, res, next) => {
+ 
+  if (gameStarted === true && req.session.loggedin) {
+    return res.render("game", {
+      user: req.session.ids
+    });
+    //return res.sendFile(path.resolve("./views/game.html"));
+  } else if (req.session.loggedin) {
     return res.sendFile(path.resolve("./views/home.html"));
   } else {
     res.send("Please login to view this page!");
@@ -16,7 +26,7 @@ home.get("/home", (req, res, next) => {
   res.end();
 });
 
-home.get("/home/newGame", (req, res, next) => {
+home.get("/newGame", (req, res, next) => {
   if (req.session.loggedin) {
     return res.sendFile(path.resolve("./views/newGame.html"));
   } else {
@@ -25,7 +35,7 @@ home.get("/home/newGame", (req, res, next) => {
   res.end();
 });
 
-home.post("/home/newGame", (req, res, next) => {
+home.post("/newGame", async (req, res, next) => {
   if (!req.session.loggedin) {
     res.send("Please login to view this page!");
   } else {
@@ -40,11 +50,13 @@ home.post("/home/newGame", (req, res, next) => {
     // } else {
     // }
   }
-  newGameSetUp(Number(req.body.cards));
+  await newGameSetUp(Number(req.body.cards));
+
+  // newGameCardsDeal(numberOfPlayers, req.session.ids);
   res.redirect("/home");
   res.end();
 });
-home.get("/home/logout", (req, res, next) => {
+home.get("/logout", (req, res, next) => {
   // destroying session === clear succession && clear points
   clearSuccession(req.session.login);
   resetUserPoints(req.session.login);
@@ -58,6 +70,12 @@ home.get("/home/logout", (req, res, next) => {
 });
 
 module.exports = home;
+
+const newGameCardsDeal = (amountOfCards, id) => {
+  console.log(id);
+};
+
+const nextRound = () => {};
 
 // helper functions
 const resetWhiteCards = () => {
@@ -149,7 +167,8 @@ const clearSuccession = async login => {
   );
 };
 
-const newGameSetUp = async numberOfCards => {
+async function newGameSetUp(numberOfCards) {
+  gameStarted = true;
   connection.query(
     "SELECT id,login,succession FROM users WHERE succession > 0",
     (err, resLogin, fields) => {
@@ -197,6 +216,4 @@ const newGameSetUp = async numberOfCards => {
       }
     }
   );
-};
-
-const nextRound = () => {};
+}

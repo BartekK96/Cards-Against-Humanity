@@ -19,8 +19,11 @@ login.post("/", (req, res, next) => {
           console.log(err);
         }
         if (response.length > 0) {
+          const id = response[0].id;
           req.session.loggedin = true;
           req.session.login = login;
+          req.session.ids = id;
+
           connection.query(
             "SELECT * FROM succession WHERE captured = ?",
             [0],
