@@ -12,6 +12,8 @@
     <!-- scoket -->
     <script src="/socket.io/socket.io.js"></script>
 
+    <link rel="stylesheet" href="./css/game.css" />
+
     <title>Home</title>
   </head>
   <body>
@@ -44,9 +46,10 @@
         </p>
       </div> -->
     </div>
+    <div class="text-center"><h2>CHOOSE ONE</h2></div>
 
-    <div class="container">
-      <div class="row" id="allWhiteCards">
+    <div class="container text-center border border-dark">
+      <div class="row " id="allWhiteCards">
         <!-- <div class="col-sm card border border-dark m-2">
           Lorem ipsum, dolor sit amet consectetur adipisicing elit. Dignissimos
           ad neque pariatur alias sint eius porro facilis, similique non
@@ -153,10 +156,9 @@
 
     <div class="container text-center">
       USERS POINTS
-      <div id="users"></div>
+      <ul id="users"></ul>
     </div>
 
-    <div>Welcome <%= user %></div>
     <script>
       let id = <%= user %>
     </script>

@@ -8,18 +8,19 @@ const connection = require("./config/mysql-connection");
 const port = process.env.PORT || 3000;
 
 let winPoints = 4;
-let gameStarted = false;
+const players = [];
+let master = 0;
 let numberOfCards = 6;
 const playersWhiteCards = [
-  { player1: { cards: null } },
-  { player2: { cards: null } },
-  { player3: { cards: null } },
-  { player4: { cards: null } },
-  { player5: { cards: null } },
-  { player6: { cards: null } },
-  { player7: { cards: null } },
-  { player8: { cards: null } },
-  { player9: { cards: null } }
+  { player: [null] },
+  { player: [null] },
+  { player: [null] },
+  { player: [null] },
+  { player: [null] },
+  { player: [null] },
+  { player: [null] },
+  { player: [null] },
+  { player: [null] }
 ];
 
 const app = express();
@@ -61,9 +62,11 @@ const io = socket(server);
 
 io.on("connection", socket => {
   console.log("made socket connection", socket.id);
+
   socket.on("setupPoints", data => {
     winPoints = data.points;
   });
+
   socket.on("setupCards", data => {
     numberOfCards = data.cards;
   });
@@ -73,10 +76,20 @@ io.on("connection", socket => {
       if (err) {
         console.log(err);
       }
+      for (let i = 0; i < res.length; i++) {
+        if (!players.includes(res[i].login)) {
+          players.push(res[i].login);
+        }
+      }
 
-      socket.emit("sendSetup", { winPoints, numberOfCards, res });
+      socket.emit("sendSetup", {
+        winPoints,
+        numberOfCards,
+        res
+      });
     }
   );
+
   socket.on("gameStarted", data => {
     if (data) {
       connection.query(
@@ -86,11 +99,58 @@ io.on("connection", socket => {
           if (err) {
             console.log(err);
           }
-          console.log(res);
+
+          if (playersWhiteCards[data.id - 1].player.length > 0) {
+            playersWhiteCards[data.id - 1].player = [];
+          }
+          for (let i = 0; i < res.length; i++) {
+            connection.query(
+              "SELECT description FROM whitecards WHERE id = ?",
+              [res[i].whiteCard],
+              (err, res) => {
+                if (err) {
+                  console.log(err);
+                }
+                playersWhiteCards[data.id - 1].player.push(res[0].description);
+              }
+            );
+          }
+
+          setTimeout(() => {
+            socket.emit(
+              "newWhiteCardsDeal",
+              playersWhiteCards[data.id - 1].player
+            );
+          }, 100);
         }
       );
-      socket.emit("newWhiteCardsDeal");
     }
+  });
+  socket.on("newTurn", data => {
+    connection.query(
+      "SELECT * FROM blackcards WHERE free = ? ORDER BY RAND() LIMIT  ?",
+      [1, 1],
+      (err, res) => {
+        if (err) {
+          console.log(err);
+        }
+
+        connection.query(
+          "UPDATE blackcards SET free = ? WHERE id = ?",
+          [0, res[0].id],
+          (err, res) => {
+            if (err) {
+              console.log(err);
+            }
+          }
+        );
+        socket.emit("newBlackCard", { data: res[0], master: players[master] });
+        master++;
+        if (players[master] === undefined) {
+          master = 0;
+        }
+      }
+    );
   });
 
   socket.on("putWhiteCard", data => {
@@ -100,4 +160,3 @@ io.on("connection", socket => {
     console.log(data);
   });
 });
-module.exports = server;

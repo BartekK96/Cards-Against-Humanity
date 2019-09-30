@@ -12,8 +12,8 @@ let player;
 
 //routing
 home.get("/", (req, res, next) => {
- 
   if (gameStarted === true && req.session.loggedin) {
+    //
     return res.render("game", {
       user: req.session.ids
     });
@@ -70,12 +70,6 @@ home.get("/logout", (req, res, next) => {
 });
 
 module.exports = home;
-
-const newGameCardsDeal = (amountOfCards, id) => {
-  console.log(id);
-};
-
-const nextRound = () => {};
 
 // helper functions
 const resetWhiteCards = () => {
