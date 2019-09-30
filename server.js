@@ -8,8 +8,9 @@ const connection = require("./config/mysql-connection");
 const port = process.env.PORT || 3000;
 
 let winPoints = 4;
-const players = [];
+let players = [];
 let master = 0;
+let masterId;
 let numberOfCards = 6;
 const playersWhiteCards = [
   { player: [null] },
@@ -71,17 +72,18 @@ io.on("connection", socket => {
     numberOfCards = data.cards;
   });
   connection.query(
-    "SELECT login,points FROM users WHERE succession > 0",
+    "SELECT id,login,points FROM users WHERE succession > 0",
     (err, res) => {
       if (err) {
         console.log(err);
       }
       for (let i = 0; i < res.length; i++) {
         if (!players.includes(res[i].login)) {
-          players.push(res[i].login);
+          pl = { ...res[i], master: false };
+          players.push(pl);
         }
       }
-
+      players = shuffle(players);
       socket.emit("sendSetup", {
         winPoints,
         numberOfCards,
@@ -144,6 +146,7 @@ io.on("connection", socket => {
             }
           }
         );
+
         socket.emit("newBlackCard", { data: res[0], master: players[master] });
         master++;
         if (players[master] === undefined) {
@@ -154,9 +157,50 @@ io.on("connection", socket => {
   });
 
   socket.on("putWhiteCard", data => {
-    console.log(data);
-  });
-  socket.on("chooseWhiteCard", data => {
-    console.log(data);
+    connection.query(
+      "SELECT * FROM whitecards WHERE free = ? ORDER BY RAND() LIMIT  ?",
+      [1, 1],
+      (err, res) => {
+        if (err) {
+          console.log(err);
+        }
+        connection.query(
+          "UPDATE whitecards SET free = ? WHERE id = ?",
+          [0, res[0].id],
+          (err, res) => {
+            if (err) {
+              console.log(err);
+            }
+          }
+        );
+        const index = playersWhiteCards[data.id - 1].player.indexOf(data.card);
+        playersWhiteCards[data.id - 1].player.splice(index, 1);
+        playersWhiteCards[data.id - 1].player.push(res[0].description);
+
+        socket.emit("allWhite", data.card);
+        socket.emit("newWhiteCardsDeal", playersWhiteCards[data.id - 1].player);
+      }
+    );
   });
 });
+
+// make master random
+function shuffle(array) {
+  var currentIndex = array.length,
+    temporaryValue,
+    randomIndex;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}
