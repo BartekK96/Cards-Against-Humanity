@@ -1,86 +1,38 @@
 const socket = io({ transports: ["websocket"], upgrade: false });
 
 const blackCard = document.getElementById("blackCard");
+const allWhiteCards = document.getElementById("allWhiteCards");
 const allYourCards = document.getElementById("allYourCards");
-const commonBoard = document.getElementById("allWhiteCards");
 const users = document.getElementById("users");
+const newGame = document.querySelector(".login-btn");
 
-// this are states variables
-let newTurn = true;
-let master;
-let added = true;
-let masterId;
-let isMaster;
+const selectPoints = document.getElementById("points");
+const selectCards = document.getElementById("cards");
 
-socket.on("sendSetup", data => {
-  let markup = "";
-  for (let i = 0; i < data.res.length; i++) {
-    markup += `<li class="active user list-group-item">${data.res[i].login}: ${data.res[i].points}/${data.winPoints}</li>`;
-  }
-  socket.emit("gameStarted", { id });
-  users.insertAdjacentHTML("afterbegin", markup);
+let myCards = [];
+
+// Starting new Game
+newGame.addEventListener("click", e => {
+  e.preventDefault();
+  points = selectPoints.options[selectPoints.selectedIndex].value;
+  cards = selectCards.options[selectCards.selectedIndex].value;
+
+  socket.emit("newGameSetup", { points, cards });
 });
 
-socket.on("newWhiteCardsDeal", data => {
+socket.on("firstDeal", data => {
+  myCards = [];
+  myCards.push(data[id - 1]);
+
   while (allYourCards.firstChild) {
     allYourCards.removeChild(allYourCards.firstChild);
   }
   let markup = "";
-  for (let i = 0; i < data.length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2 your_card">${data[i]}</div>`;
+  for (let i = 0; i < myCards[0].length; i++) {
+    console.log(myCards[0][i]);
+    markup += `<div class="col-sm card border border-dark m-2">
+                ${myCards[0][i]}
+              </div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
-});
-
-if (newTurn) {
-  newTurn = false;
-
-  socket.emit("newTurn", true);
-  socket.on("newBlackCard", data => {
-    added = false;
-    while (blackCard.firstChild) {
-      blackCard.removeChild(blackCard.firstChild);
-    }
-    let markup = ``;
-    markup += `<div class="card-body">
-                  <p class="card-text">
-                  ${data.data.description}
-                  </p>
-                </div>`;
-    blackCard.insertAdjacentHTML("afterbegin", markup);
-    master = data.master.login;
-    masterId = data.master.id;
-    // removing active
-    const users = document.querySelectorAll(".user");
-    [].forEach.call(users, function(el) {
-      el.classList.remove("active");
-      if (el.innerHTML.split(":")[0] === `${master}`) {
-        el.setAttribute("class", "active user list-group-item");
-      }
-    });
-  });
-}
-// // Your choose dealing
-const yourCards = document.querySelectorAll(".your_card");
-
-allYourCards.addEventListener("click", e => {
-  e.preventDefault();
-  if (!added) {
-    added = true;
-    let card = e.target.closest("div");
-    if (card.innerHTML[0] !== "<") {
-      card.parentNode.removeChild(card);
-
-      socket.emit("putWhiteCard", { card: card.innerHTML, id });
-    }
-  }
-});
-
-//common board
-socket.on("allWhite", data => {
-  let markup = ``;
-  markup += `<div class="col-sm card border border-dark m-2">
-             ${data}
-            </div>`;
-  commonBoard.insertAdjacentHTML("afterbegin", markup);
 });

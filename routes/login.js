@@ -4,7 +4,7 @@ const path = require("path");
 const connection = require("../config/mysql-connection");
 
 login.get("/", (req, res, next) => {
-  res.sendFile(path.resolve("./views/login.html"));
+  res.render("login");
 });
 
 login.post("/", (req, res, next) => {
@@ -23,7 +23,7 @@ login.post("/", (req, res, next) => {
           req.session.loggedin = true;
           req.session.login = login;
           req.session.ids = id;
-
+          const user = { id: req.session.ids, login: req.session.login };
           connection.query(
             "SELECT * FROM succession WHERE captured = ?",
             [0],
@@ -51,6 +51,7 @@ login.post("/", (req, res, next) => {
                   }
                 );
                 res.redirect("/home");
+                // res.render("game", { user });
               } else {
                 res.send("No place!");
               }
@@ -59,8 +60,6 @@ login.post("/", (req, res, next) => {
         } else {
           res.send("Incorrect Username and/or Password!");
         }
-        //  res.end();
-        // next();
       }
     );
   } else {

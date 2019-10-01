@@ -7,23 +7,15 @@ const connection = require("./config/mysql-connection");
 
 const port = process.env.PORT || 3000;
 
-let winPoints = 4;
-let players = [];
-let master = 0;
-let masterId;
-let numberOfCards = 6;
-const playersWhiteCards = [
-  { player: [null] },
-  { player: [null] },
-  { player: [null] },
-  { player: [null] },
-  { player: [null] },
-  { player: [null] },
-  { player: [null] },
-  { player: [null] },
-  { player: [null] }
-];
-
+// game settings
+master = {};
+players = [];
+winPoints = 0;
+numberOfCards = 0;
+newGame = false;
+// id -1 === pleyersCards[id-1]
+playersCards = [[], [], [], [], [], [], [], [], []];
+//
 const app = express();
 app.use(
   session({
@@ -63,128 +55,77 @@ const io = socket(server);
 
 io.on("connection", socket => {
   console.log("made socket connection", socket.id);
-
-  socket.on("setupPoints", data => {
+  let finishSetup = false;
+  socket.on("newGameSetup", async data => {
+    clearDistribution();
+    resetUserPoints();
+    resetWhiteCards();
+    resetBlackCards();
+    players = [];
+    playersCards = [[], [], [], [], [], [], [], [], []];
+    newGame = true;
     winPoints = data.points;
-  });
-
-  socket.on("setupCards", data => {
     numberOfCards = data.cards;
-  });
-  connection.query(
-    "SELECT id,login,points FROM users WHERE succession > 0",
-    (err, res) => {
-      if (err) {
-        console.log(err);
-      }
-      for (let i = 0; i < res.length; i++) {
-        if (!players.includes(res[i].login)) {
-          pl = { ...res[i], master: false };
-          players.push(pl);
-        }
-      }
-      players = shuffle(players);
-      socket.emit("sendSetup", {
-        winPoints,
-        numberOfCards,
-        res
-      });
-    }
-  );
 
-  socket.on("gameStarted", data => {
-    if (data) {
+    await newGameSetUp(Number(numberOfCards));
+    if (newGame) {
+      newGame = false;
+
       connection.query(
-        "SELECT * FROM distribution WHERE login = ?",
-        [data.id],
+        "SELECT id,login,points FROM users WHERE succession > 0",
         (err, res) => {
           if (err) {
             console.log(err);
           }
 
-          if (playersWhiteCards[data.id - 1].player.length > 0) {
-            playersWhiteCards[data.id - 1].player = [];
-          }
           for (let i = 0; i < res.length; i++) {
-            connection.query(
-              "SELECT description FROM whitecards WHERE id = ?",
-              [res[i].whiteCard],
-              (err, res) => {
-                if (err) {
-                  console.log(err);
-                }
-                playersWhiteCards[data.id - 1].player.push(res[0].description);
-              }
-            );
+            players.push(res[i]);
           }
+          shuffle(players);
 
           setTimeout(() => {
-            socket.emit(
-              "newWhiteCardsDeal",
-              playersWhiteCards[data.id - 1].player
-            );
-          }, 100);
+            connection.query("SELECT * FROM distribution", (err, response) => {
+              if (err) {
+                console.log(err);
+              }
+
+              for (let i = 0; i < response.length; i++) {
+                connection.query(
+                  "SELECT description FROM whitecards WHERE id = ?",
+                  [response[i].whiteCard],
+                  (err, res) => {
+                    if (err) {
+                      console.log(err);
+                    }
+                    playersCards[response[i].login - 1].push(
+                      res[0].description
+                    );
+                  }
+                );
+
+                if (i === response.length - 1) {
+                  setTimeout(() => {
+                    finishSetup = true;
+                  }, 1000);
+                }
+              }
+            });
+          }, 200);
         }
       );
     }
   });
-  socket.on("newTurn", data => {
-    connection.query(
-      "SELECT * FROM blackcards WHERE free = ? ORDER BY RAND() LIMIT  ?",
-      [1, 1],
-      (err, res) => {
-        if (err) {
-          console.log(err);
-        }
 
-        connection.query(
-          "UPDATE blackcards SET free = ? WHERE id = ?",
-          [0, res[0].id],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-          }
-        );
-
-        socket.emit("newBlackCard", { data: res[0], master: players[master] });
-        master++;
-        if (players[master] === undefined) {
-          master = 0;
-        }
-      }
-    );
-  });
-
-  socket.on("putWhiteCard", data => {
-    connection.query(
-      "SELECT * FROM whitecards WHERE free = ? ORDER BY RAND() LIMIT  ?",
-      [1, 1],
-      (err, res) => {
-        if (err) {
-          console.log(err);
-        }
-        connection.query(
-          "UPDATE whitecards SET free = ? WHERE id = ?",
-          [0, res[0].id],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-          }
-        );
-        const index = playersWhiteCards[data.id - 1].player.indexOf(data.card);
-        playersWhiteCards[data.id - 1].player.splice(index, 1);
-        playersWhiteCards[data.id - 1].player.push(res[0].description);
-
-        socket.emit("allWhite", data.card);
-        socket.emit("newWhiteCardsDeal", playersWhiteCards[data.id - 1].player);
-      }
-    );
-  });
+  const newDeal = setInterval(() => {
+    if (finishSetup) {
+      socket.emit("firstDeal", playersCards);
+      socket.broadcast.emit("firstDeal", playersCards);
+      clearInterval(newDeal);
+    }
+  }, 100);
 });
 
-// make master random
+// shuffle function - randomize succession
 function shuffle(array) {
   var currentIndex = array.length,
     temporaryValue,
@@ -204,3 +145,103 @@ function shuffle(array) {
 
   return array;
 }
+
+async function newGameSetUp(numberOfCards) {
+  connection.query(
+    "SELECT id,login,succession FROM users WHERE succession > 0",
+    (err, resLogin, fields) => {
+      if (err) {
+        console.log(err);
+      }
+
+      // for each user
+      for (let j = 0; j < resLogin.length; j++) {
+        setTimeout(() => {
+          connection.query(
+            "SELECT * FROM whitecards WHERE free = ?  ORDER BY RAND() LIMIT ?",
+            [1, numberOfCards],
+            (err, resCards, fields) => {
+              if (err) {
+                console.log(err);
+              }
+
+              for (let i = 0; i < resCards.length; i++) {
+                connection.query(
+                  "UPDATE whitecards SET free = ? WHERE id = ?",
+                  [0, resCards[i].id],
+                  (err, res) => {
+                    if (err) {
+                      console.log(err);
+                    }
+                  }
+                );
+
+                connection.query(
+                  "INSERT INTO distribution (login,whitecard) VALUES ( ? , ? )",
+                  [resLogin[j].id, resCards[i].id],
+                  (err, res) => {
+                    if (err) {
+                      console.log(err);
+                    }
+                  }
+                );
+              }
+            }
+          );
+        }, 100 * j);
+      }
+    }
+  );
+}
+
+// helper
+const resetWhiteCards = () => {
+  connection.query(
+    "UPDATE whitecards SET free = ?",
+    [1],
+    (err, res, fields) => {
+      if (err) {
+        console.log(err);
+      }
+    }
+  );
+};
+const clearDistribution = () => {
+  connection.query("DELETE FROM distribution", (err, res, fields) => {
+    if (err) {
+      console.log(err);
+    }
+  });
+};
+
+const resetBlackCards = () => {
+  connection.query(
+    "UPDATE blackcards SET free = ?",
+    [1],
+    (err, res, fields) => {
+      if (err) {
+        console.log(err);
+      }
+    }
+  );
+};
+
+const resetUserPoints = login => {
+  if (login === undefined) {
+    connection.query("UPDATE users SET points=?", [0], (err, res, fields) => {
+      if (err) {
+        console.log(err);
+      }
+    });
+  } else {
+    connection.query(
+      "UPDATE users SET points = ? WHERE login = ?",
+      [0, login],
+      (err, res, fields) => {
+        if (err) {
+          console.log(err);
+        }
+      }
+    );
+  }
+};
