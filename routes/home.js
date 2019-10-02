@@ -15,17 +15,36 @@ home.get("/", (req, res, next) => {
   res.end();
 });
 
+home.get("/newGame", (req, res, next) => {
+  if (req.session.loggedin) {
+    return res.render("newGame");
+  } else {
+    res.send("Please login to view this page!");
+  }
+  res.end();
+});
+home.post("/newGame", (req, res, next) => {
+  if (req.session.loggedin) {
+    res.redirect("/home");
+  } else {
+    res.send("Please login to view this page!");
+  }
+  res.end();
+});
+
 home.get("/logout", (req, res, next) => {
   // destroying session === clear succession && clear points
-  clearSuccession(req.session.login);
-  resetUserPoints(req.session.login);
+  if (req.session.loggedin) {
+    clearSuccession(req.session.login);
+    resetUserPoints(req.session.login);
 
-  req.session.destroy(err => {
-    if (err) {
-      console.log(err);
-    }
-    res.redirect("/");
-  });
+    req.session.destroy(err => {
+      if (err) {
+        console.log(err);
+      }
+      res.redirect("/");
+    });
+  }
 });
 
 module.exports = home;
@@ -67,6 +86,7 @@ const clearSuccession = async login => {
   const interval = setInterval(() => {
     if (id !== undefined) {
       clearInterval(interval);
+
       connection.query(
         "UPDATE succession SET captured = ? WHERE id = ?",
         [0, id],

@@ -18,14 +18,6 @@ let points;
 let added = false;
 let ready = false;
 
-// Starting new Game
-newGame.addEventListener("click", e => {
-  e.preventDefault();
-  points = selectPoints.options[selectPoints.selectedIndex].value;
-  cards = selectCards.options[selectCards.selectedIndex].value;
-
-  socket.emit("newGameSetup", { points, cards });
-});
 socket.on("winPoints", data => {
   points = data;
 });
@@ -41,12 +33,12 @@ socket.on("firstDeal", data => {
   }
   let markup = "";
   for (let i = 0; i < myCards[0].length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2">${myCards[0][i]}</div>`;
+    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i]}</div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
   markup = "";
   for (let i = 0; i < players.length; i++) {
-    markup += `<li class="active user list-group-item">${players[i].login}: ${players[i].points}/${points}</li>`;
+    markup += `<li class="act user list-group-item">${players[i].login}: ${players[i].points}/${points}</li>`;
   }
   while (users.firstChild) {
     users.removeChild(users.firstChild);
@@ -60,7 +52,7 @@ socket.on("firstBlack", data => {
     blackCard.removeChild(blackCard.firstChild);
   }
   let markup = ``;
-  markup += `<div class="card-body">
+  markup += `<div class="card-body black">
                 <p class="card-text">
                 ${data[0].description}
                 </p>
@@ -102,7 +94,7 @@ allWhiteCards.addEventListener("click", e => {
 // common board
 socket.on("allWhite", data => {
   let markup = ``;
-  markup += `<div class="col-sm card border border-dark m-2">${data}</div>`;
+  markup += `<div class="col-sm card border border-dark m-2 white">${data}</div>`;
   allWhiteCards.insertAdjacentHTML("afterbegin", markup);
 });
 // newWhiteDeal
@@ -113,7 +105,7 @@ socket.on("newWhiteDeal", data => {
   }
   let markup = "";
   for (let i = 0; i < myCards.length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2">${myCards[i]}</div>`;
+    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[i]}</div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
 });
@@ -121,7 +113,12 @@ socket.on("newWhiteDeal", data => {
 socket.on("playersPoints", data => {
   for (let i = 0; i < players.length; i++) {
     players[i].points = data[players[i].id - 1];
+    if (Number(players[i].points) === Number(points)) {
+      console.log("Game is Finished!");
+      socket.emit("gameFinish", true);
+    }
   }
+
   updatePoints();
 });
 
@@ -136,12 +133,13 @@ socket.on("newRound", data => {
     allWhiteCards.removeChild(allWhiteCards.firstChild);
   }
   let markup = ``;
-  markup += `<div class="card-body">
+  markup += `<div class="card-body black">
                 <p class="card-text">
                 ${data.res[0].description}
                 </p>
               </div>`;
   blackCard.insertAdjacentHTML("afterbegin", markup);
+  removingActive(master.login);
 });
 
 // changing master front
@@ -149,10 +147,10 @@ const removingActive = master => {
   // removing active
   const allUsers = document.querySelectorAll(".user");
   allUsers.forEach.call(allUsers, function(el) {
-    el.classList.remove("active");
+    el.classList.remove("act");
 
     if (el.innerHTML.split(":")[0] === `${master}`) {
-      el.setAttribute("class", "active user list-group-item");
+      el.setAttribute("class", "act user list-group-item");
     }
   });
 };
@@ -160,7 +158,7 @@ const removingActive = master => {
 const updatePoints = () => {
   markup = "";
   for (let i = 0; i < players.length; i++) {
-    markup += `<li class="active user list-group-item">${players[i].login}: ${players[i].points}/${points}</li>`;
+    markup += `<li class="act user list-group-item ">${players[i].login}: ${players[i].points}/${points}</li>`;
   }
   while (users.firstChild) {
     users.removeChild(users.firstChild);
