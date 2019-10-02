@@ -8,13 +8,15 @@ const connection = require("./config/mysql-connection");
 const port = process.env.PORT || 3000;
 
 // game settings
-master = {};
-players = [];
-winPoints = 0;
-numberOfCards = 0;
-newGame = false;
+let master = 0;
+let players = [];
+let winPoints = 0;
+let numberOfCards = 0;
+let newGame = false;
+let choosenWhite = [];
 // id -1 === pleyersCards[id-1]
-playersCards = [[], [], [], [], [], [], [], [], []];
+let playersCards = [[], [], [], [], [], [], [], [], []];
+let playersPoints = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 //
 const app = express();
 app.use(
@@ -56,7 +58,9 @@ const io = socket(server);
 io.on("connection", socket => {
   console.log("made socket connection", socket.id);
   let finishSetup = false;
+  const card = {};
   socket.on("newGameSetup", async data => {
+    socket.broadcast.emit("winPoints", data.points);
     clearDistribution();
     resetUserPoints();
     resetWhiteCards();
@@ -70,6 +74,27 @@ io.on("connection", socket => {
     await newGameSetUp(Number(numberOfCards));
     if (newGame) {
       newGame = false;
+
+      connection.query(
+        "SELECT * FROM blackcards WHERE free = ? ORDER BY RAND() LIMIT  ?",
+        [1, 1],
+        (err, res) => {
+          if (err) {
+            console.log(err);
+          }
+          socket.emit("firstBlack", res);
+          socket.broadcast.emit("firstBlack", res);
+          connection.query(
+            "UPDATE blackcards SET free = ? WHERE id = ?",
+            [0, res[0].id],
+            (err, res) => {
+              if (err) {
+                console.log(err);
+              }
+            }
+          );
+        }
+      );
 
       connection.query(
         "SELECT id,login,points FROM users WHERE succession > 0",
@@ -111,18 +136,106 @@ io.on("connection", socket => {
               }
             });
           }, 200);
+
+          if (finishSetup) {
+            socket.emit("firstDeal", { playersCards, master: players[master] });
+            socket.broadcast.emit("firstDeal", {
+              playersCards,
+              master: players[master]
+            });
+            finishSetup = false;
+          } else {
+            const newDeal = setInterval(() => {
+              if (finishSetup) {
+                socket.emit("firstDeal", {
+                  playersCards,
+                  master: players[master],
+                  players
+                });
+                socket.broadcast.emit("firstDeal", {
+                  playersCards,
+                  master: players[master],
+                  players
+                });
+                finishSetup = false;
+                clearInterval(newDeal);
+              }
+            }, 100);
+          }
         }
       );
     }
   });
 
-  const newDeal = setInterval(() => {
-    if (finishSetup) {
-      socket.emit("firstDeal", playersCards);
-      socket.broadcast.emit("firstDeal", playersCards);
-      clearInterval(newDeal);
+  socket.on("putWhiteCard", data => {
+    connection.query(
+      "SELECT * FROM whitecards WHERE free = ? ORDER BY RAND() LIMIT  ?",
+      [1, 1],
+      (err, res) => {
+        if (err) {
+          console.log(err);
+        }
+        connection.query(
+          "UPDATE whitecards SET free = ? WHERE id = ?",
+          [0, res[0].id],
+          (err, res) => {
+            if (err) {
+              console.log(err);
+            }
+          }
+        );
+        const card = {};
+        card.id = data.id;
+
+        const index = playersCards[data.id - 1].indexOf(data.card);
+        card.card = playersCards[data.id - 1].splice(index, 1);
+        playersCards[data.id - 1].push(res[0].description);
+        socket.broadcast.emit("allWhite", data.card);
+        socket.emit("allWhite", data.card);
+        socket.emit("newWhiteDeal", playersCards[data.id - 1]);
+        choosenWhite.push(card);
+      }
+    );
+  });
+  socket.on("whiteChoose", data => {
+    master++;
+    if (master === players.length) {
+      master = 0;
     }
-  }, 100);
+
+    for (let i = 0; i < choosenWhite.length; i++) {
+      if (choosenWhite[i].card[0] === data.card) {
+        playersPoints[choosenWhite[i].id - 1]++;
+        choosenWhite = [];
+        break;
+      }
+    }
+    socket.emit("playersPoints", playersPoints);
+    socket.broadcast.emit("playersPoints", playersPoints);
+
+    //new round
+    connection.query(
+      "SELECT * FROM blackcards WHERE free = ? ORDER BY RAND() LIMIT  ?",
+      [1, 1],
+      (err, res) => {
+        if (err) {
+          console.log(err);
+        }
+        socket.emit("newRound", { res, master: players[master] });
+        socket.broadcast.emit("newRound", { res, master: players[master] });
+
+        connection.query(
+          "UPDATE blackcards SET free = ? WHERE id = ?",
+          [0, res[0].id],
+          (err, res) => {
+            if (err) {
+              console.log(err);
+            }
+          }
+        );
+      }
+    );
+  });
 });
 
 // shuffle function - randomize succession
