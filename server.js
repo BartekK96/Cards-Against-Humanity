@@ -70,6 +70,7 @@ io.on("connection", socket => {
       resetBlackCards();
       players = [];
       playersCards = [[], [], [], [], [], [], [], [], []];
+      playersPoints = [0, 0, 0, 0, 0, 0, 0, 0, 0];
       newGame = true;
       winPoints = data.points;
       numberOfCards = data.cards;
@@ -141,7 +142,7 @@ io.on("connection", socket => {
                   }
                 }
               );
-            }, 200);
+            }, 2000);
 
             if (finishSetup) {
               socket.emit("firstDeal", {
@@ -169,12 +170,12 @@ io.on("connection", socket => {
                   finishSetup = false;
                   clearInterval(newDeal);
                 }
-              }, 100);
+              }, 1000);
             }
           }
         );
       }
-    }, 200);
+    }, 2000);
   });
 
   socket.on("putWhiteCard", data => {

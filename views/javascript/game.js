@@ -19,7 +19,10 @@ let added = false;
 let ready = false;
 
 socket.on("winPoints", data => {
+  boardCards = [];
   points = data;
+  ready = false;
+  added = false;
 });
 
 socket.on("firstDeal", data => {
