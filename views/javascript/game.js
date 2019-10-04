@@ -17,6 +17,7 @@ let players = [];
 let points;
 let added = false;
 let ready = false;
+let gameStarted = false;
 
 socket.on("winPoints", data => {
   boardCards = [];
@@ -25,7 +26,74 @@ socket.on("winPoints", data => {
   added = false;
 });
 
+// redirect
+if (window.performance) {
+  socket.emit("refreshReq", true);
+  socket.on("gameStarted", data => {
+    gameStarted = data;
+
+    if (
+      (performance.navigation.type === 1 &&
+        performance.navigation.redirectCount === 0 &&
+        gameStarted) ||
+      (performance.navigation.type === 0 &&
+        performance.navigation.redirectCount === 0 &&
+        gameStarted)
+    ) {
+      socket.on("refreshDeal", data => {
+        if (data.playersAdded[id - 1] === 1) {
+          added = true;
+        }
+        points = data.winPoints;
+        master = data.master;
+        masterId = master.id;
+        players = data.players;
+        myCards = [];
+        myCards.push(data.playersCards[id - 1]);
+        while (allYourCards.firstChild) {
+          allYourCards.removeChild(allYourCards.firstChild);
+        }
+        let markup = "";
+        for (let i = 0; i < myCards[0].length; i++) {
+          markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i]}</div>`;
+        }
+        allYourCards.insertAdjacentHTML("afterbegin", markup);
+        markup = "";
+
+        for (let i = 0; i < players.length; i++) {
+          markup += `<li class="act user list-group-item">${players[i].login}: ${players[i].points}/${points}</li>`;
+        }
+        while (users.firstChild) {
+          users.removeChild(users.firstChild);
+        }
+        users.insertAdjacentHTML("afterbegin", markup);
+        removingActive(master.login);
+
+        while (blackCard.firstChild) {
+          blackCard.removeChild(blackCard.firstChild);
+        }
+
+        markup = "";
+        markup += `<div class="card-body black">
+                      <p class="card-text">
+                      ${data.currentBlack[0].description}
+                      </p>
+                    </div>`;
+        blackCard.insertAdjacentHTML("afterbegin", markup);
+        markup = "";
+        boardCards = data.choosenWhite;
+
+        for (let i = 0; i < boardCards.length; i++) {
+          markup += `<div class="col-sm card border border-dark m-2 white">${boardCards[i].card}</div>`;
+        }
+        allWhiteCards.insertAdjacentHTML("afterbegin", markup);
+      });
+    }
+  });
+}
+
 socket.on("firstDeal", data => {
+  gameStarted = true;
   master = data.master;
   masterId = master.id;
   players = data.players;

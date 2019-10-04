@@ -14,6 +14,9 @@ let winPoints = 0;
 let numberOfCards = 0;
 let newGame = false;
 let choosenWhite = [];
+let currentBlack = null;
+let gameStarted = false;
+let playersAdded = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 // id -1 === pleyersCards[id-1]
 let playersCards = [[], [], [], [], [], [], [], [], []];
 let playersPoints = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -60,6 +63,8 @@ io.on("connection", socket => {
   let finishSetup = false;
   const card = {};
   socket.on("newGameSetup", async data => {
+    gameStarted = true;
+
     setTimeout(async () => {
       socket.broadcast.emit("winPoints", data.points);
       socket.emit("winPoints", data.points);
@@ -86,6 +91,7 @@ io.on("connection", socket => {
             if (err) {
               console.log(err);
             }
+            currentBlack = res;
             socket.emit("firstBlack", res);
             socket.broadcast.emit("firstBlack", res);
             connection.query(
@@ -204,12 +210,14 @@ io.on("connection", socket => {
         socket.broadcast.emit("allWhite", data.card);
         socket.emit("allWhite", data.card);
         socket.emit("newWhiteDeal", playersCards[data.id - 1]);
+        playersAdded[data.id - 1] = 1;
         choosenWhite.push(card);
       }
     );
   });
   socket.on("whiteChoose", data => {
     master++;
+    playersAdded = [];
     if (master === players.length) {
       master = 0;
     }
@@ -234,7 +242,7 @@ io.on("connection", socket => {
         }
         socket.emit("newRound", { res, master: players[master] });
         socket.broadcast.emit("newRound", { res, master: players[master] });
-
+        currentBlack = res;
         connection.query(
           "UPDATE blackcards SET free = ? WHERE id = ?",
           [0, res[0].id],
@@ -246,6 +254,22 @@ io.on("connection", socket => {
         );
       }
     );
+  });
+  socket.on("refreshReq", data => {
+    if (gameStarted) {
+      socket.emit("gameStarted", true);
+    }
+    if (data && gameStarted) {
+      socket.emit("refreshDeal", {
+        playersCards,
+        master: players[master],
+        players,
+        currentBlack,
+        choosenWhite,
+        winPoints,
+        playersAdded
+      });
+    }
   });
   socket.on("gameFinish", data => {
     console.log(data);
