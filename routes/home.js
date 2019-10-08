@@ -49,8 +49,8 @@ home.get("/logout", async (req, res, next) => {
 module.exports = home;
 
 // helper functions
-
-const resetUserPoints = login => {
+// need to add sequelize
+const resetUserPoints = async login => {
   if (login !== undefined) {
     connection.query("UPDATE users SET points=?", [0], (err, res, fields) => {
       if (err) {

@@ -197,7 +197,7 @@ allWhiteCards.addEventListener("click", e => {
 
 socket.on("whiteChoose", data => {
   newRound = true;
-  choosenWhite = data[0];
+  choosenWhite = data;
   while (allWhiteCards.firstChild) {
     allWhiteCards.removeChild(allWhiteCards.firstChild);
   }
@@ -206,7 +206,7 @@ socket.on("whiteChoose", data => {
     for (let j = 0; j < boardCards[i].length; j++) {
       if (choosenWhite[0].description === boardCards[i][j][0].description) {
         boardCards = [[], [], [], [], [], [], [], [], []];
-        boardCards[i].push(choosenWhite[0]);
+        boardCards[i].push(choosenWhite);
         break;
       }
     }
@@ -217,7 +217,7 @@ socket.on("whiteChoose", data => {
   for (let i = 0; i < boardCards.length; i++) {
     markup += "<div class='col'>";
     for (let j = 0; j < boardCards[i].length; j++) {
-      markup += `<div class="card border border-dark m-2 black">${boardCards[i][j].description}</div>`;
+      markup += `<div class="card border border-dark m-2 black">${boardCards[i][j][0].description}</div>`;
     }
     markup += "</div>";
   }
