@@ -3,7 +3,16 @@ var session = require("express-session");
 var bodyParser = require("body-parser");
 const socket = require("socket.io");
 var path = require("path");
-const connection = require("./config/mysql-connection");
+const Sequelize = require("sequelize");
+
+// Models
+const User = require("./models/User");
+const Black = require("./models/BlackCard");
+const White = require("./models/WhiteCard");
+const Distribution = require("./models/Distribution");
+
+//DB
+const Op = Sequelize.Op;
 
 const port = process.env.PORT || 3000;
 
@@ -13,10 +22,11 @@ let players = [];
 let winPoints = 0;
 let numberOfCards = 0;
 let newGame = false;
-let choosenWhite = [];
+let choosenWhite = [[], [], [], [], [], [], [], [], []];
 let currentBlack = null;
 let gameStarted = false;
 let playersAdded = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+let numberOfWhiteToAdd = 0;
 // id -1 === pleyersCards[id-1]
 let playersCards = [[], [], [], [], [], [], [], [], []];
 let playersPoints = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -41,8 +51,6 @@ app.set("view engine", "ejs");
 const home = require("./routes/home");
 app.use("/home", home);
 app.use("/home", (req, res, next) => {
-  // console.log(req.session);
-
   next();
 });
 
@@ -57,204 +65,195 @@ const server = app.listen(port, () => {
 });
 
 const io = socket(server);
-
-io.on("connection", socket => {
+io.on("connection", async socket => {
   console.log("made socket connection", socket.id);
-  let finishSetup = false;
-  const card = {};
+
+  // waiting for user socket
+  socket.emit("allowNewGame", true);
+
   socket.on("newGameSetup", async data => {
     gameStarted = true;
 
-    setTimeout(async () => {
-      socket.broadcast.emit("winPoints", data.points);
-      socket.emit("winPoints", data.points);
+    await clearDistribution();
+    await resetUserPoints();
+    await resetWhiteCards();
+    await resetBlackCards();
+    players = [];
+    playersCards = [[], [], [], [], [], [], [], [], []];
+    playersPoints = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    newGame = true;
+    winPoints = data.points;
+    numberOfCards = data.cards;
 
-      clearDistribution();
-      resetUserPoints();
-      resetWhiteCards();
-      resetBlackCards();
-      players = [];
-      playersCards = [[], [], [], [], [], [], [], [], []];
-      playersPoints = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-      newGame = true;
-      winPoints = data.points;
-      numberOfCards = data.cards;
+    await newGameSetUp(Number(numberOfCards));
+    if (newGame) {
+      newGame = false;
 
-      await newGameSetUp(Number(numberOfCards));
-      if (newGame) {
-        newGame = false;
-
-        connection.query(
-          "SELECT * FROM blackcards WHERE free = ? ORDER BY RAND() LIMIT  ?",
-          [1, 1],
-          (err, res) => {
-            if (err) {
+      await Black.findAll({
+        order: [[Sequelize.literal("RAND()")]],
+        limit: 1
+      })
+        .then(async black => {
+          await black[0]
+            .update({ free: 0 })
+            .then()
+            .catch(err => {
               console.log(err);
-            }
-            currentBlack = res;
-            socket.emit("firstBlack", res);
-            socket.broadcast.emit("firstBlack", res);
-            connection.query(
-              "UPDATE blackcards SET free = ? WHERE id = ?",
-              [0, res[0].id],
-              (err, res) => {
-                if (err) {
-                  console.log(err);
-                }
-              }
-            );
-          }
-        );
+            });
 
-        connection.query(
-          "SELECT id,login,points FROM users WHERE succession > 0",
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
+          currentBlack = black[0].dataValues;
+          numberOfWhiteToAdd = currentBlack.description.split("???").length - 1;
 
-            for (let i = 0; i < res.length; i++) {
-              players.push(res[i]);
-            }
-            shuffle(players);
+          socket.emit("firstBlack", currentBlack);
+          socket.broadcast.emit("firstBlack", currentBlack);
+        })
+        .catch(err => {
+          console.log(err);
+        });
 
-            setTimeout(() => {
-              connection.query(
-                "SELECT * FROM distribution",
-                (err, response) => {
-                  if (err) {
-                    console.log(err);
-                  }
-
-                  for (let i = 0; i < response.length; i++) {
-                    connection.query(
-                      "SELECT description FROM whitecards WHERE id = ?",
-                      [response[i].whiteCard],
-                      (err, res) => {
-                        if (err) {
-                          console.log(err);
-                        }
-                        playersCards[response[i].login - 1].push(
-                          res[0].description
-                        );
-                      }
+      await User.findAll({ where: { succession: { [Op.gt]: 0 } } })
+        .then(async users => {
+          await addPlayers(users);
+        })
+        .then(async () => {
+          await Distribution.findAll()
+            .then(async distributions => {
+              for (let i = 0; i < distributions.length; i++) {
+                await White.findOne({
+                  where: { id: distributions[i].whiteCard }
+                })
+                  .then(white => {
+                    playersCards[distributions[i].login - 1].push(
+                      white.dataValues
                     );
+                  })
+                  .catch(err => console.log(err));
+              }
+            })
+            .catch(err => {
+              console.log(err);
+            })
+            .then(async () => {
+              socket.broadcast.emit("winPoints", data.points);
+              socket.emit("winPoints", data.points);
 
-                    if (i === response.length - 1) {
-                      setTimeout(() => {
-                        finishSetup = true;
-                      }, 1000);
-                    }
-                  }
-                }
-              );
-            }, 2000);
-
-            if (finishSetup) {
               socket.emit("firstDeal", {
                 playersCards,
-                master: players[master]
+                master: players[master],
+                players,
+                numberOfWhiteToAdd
               });
               socket.broadcast.emit("firstDeal", {
                 playersCards,
-                master: players[master]
+                master: players[master],
+                players,
+                numberOfWhiteToAdd
               });
-              finishSetup = false;
-            } else {
-              const newDeal = setInterval(() => {
-                if (finishSetup) {
-                  socket.emit("firstDeal", {
-                    playersCards,
-                    master: players[master],
-                    players
-                  });
-                  socket.broadcast.emit("firstDeal", {
-                    playersCards,
-                    master: players[master],
-                    players
-                  });
-                  finishSetup = false;
-                  clearInterval(newDeal);
-                }
-              }, 1000);
-            }
-          }
-        );
-      }
-    }, 2000);
-  });
-
-  socket.on("putWhiteCard", data => {
-    connection.query(
-      "SELECT * FROM whitecards WHERE free = ? ORDER BY RAND() LIMIT  ?",
-      [1, 1],
-      (err, res) => {
-        if (err) {
+            });
+        })
+        .catch(err => {
           console.log(err);
-        }
-        connection.query(
-          "UPDATE whitecards SET free = ? WHERE id = ?",
-          [0, res[0].id],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-          }
-        );
-        const card = {};
-        card.id = data.id;
-
-        const index = playersCards[data.id - 1].indexOf(data.card);
-        card.card = playersCards[data.id - 1].splice(index, 1);
-        playersCards[data.id - 1].push(res[0].description);
-        socket.broadcast.emit("allWhite", data.card);
-        socket.emit("allWhite", data.card);
-        socket.emit("newWhiteDeal", playersCards[data.id - 1]);
-        playersAdded[data.id - 1] = 1;
-        choosenWhite.push(card);
-      }
-    );
-  });
-  socket.on("whiteChoose", data => {
-    master++;
-    playersAdded = [];
-    if (master === players.length) {
-      master = 0;
+        });
     }
+  });
 
+  socket.on("putWhiteCard", async data => {
+    await White.findAll({
+      order: [[Sequelize.literal("RAND()")]],
+      limit: 1
+    })
+      .then(async white => {
+        white[0]
+          .update({ free: 0 })
+          .then()
+          .catch(err => {
+            console.log(err);
+          });
+
+        const index = playersCards[data.id - 1].indexOf(
+          playersCards[data.id - 1].find(card => {
+            return card.description === data.card;
+          })
+        );
+
+        card = playersCards[data.id - 1].splice(index, 1);
+        choosenWhite[data.id - 1].push(card);
+        playersCards[data.id - 1].push(white[0].dataValues);
+
+        playersAdded[data.id - 1]++;
+
+        if (
+          playersAdded.reduce((a, b) => a + b, 0) ===
+          (players.length - 1) * numberOfWhiteToAdd
+        ) {
+          socket.broadcast.emit("allWhite", choosenWhite);
+          socket.emit("allWhite", choosenWhite);
+
+          socket.emit("newWhiteDeal", playersCards);
+          socket.broadcast.emit("newWhiteDeal", playersCards);
+        }
+      })
+      .catch(err => {
+        console.log(err);
+      });
+  });
+  socket.on("whiteChoose", async data => {
     for (let i = 0; i < choosenWhite.length; i++) {
-      if (choosenWhite[i].card[0] === data.card) {
-        playersPoints[choosenWhite[i].id - 1]++;
-        choosenWhite = [];
-        break;
+      for (let j = 0; j < choosenWhite[i].length; j++) {
+        if (choosenWhite[i][j][0].description === data.card) {
+          playersPoints[i]++;
+          socket.emit("whiteChoose", choosenWhite[i]);
+          socket.broadcast.emit("whiteChoose", choosenWhite[i]);
+          choosenWhite = [[], [], [], [], [], [], [], [], []];
+          break;
+        }
       }
     }
     socket.emit("playersPoints", playersPoints);
     socket.broadcast.emit("playersPoints", playersPoints);
-
-    //new round
-    connection.query(
-      "SELECT * FROM blackcards WHERE free = ? ORDER BY RAND() LIMIT  ?",
-      [1, 1],
-      (err, res) => {
-        if (err) {
-          console.log(err);
-        }
-        socket.emit("newRound", { res, master: players[master] });
-        socket.broadcast.emit("newRound", { res, master: players[master] });
-        currentBlack = res;
-        connection.query(
-          "UPDATE blackcards SET free = ? WHERE id = ?",
-          [0, res[0].id],
-          (err, res) => {
-            if (err) {
-              console.log(err);
-            }
-          }
-        );
-      }
-    );
   });
+  socket.on("new", async data => {
+    master++;
+    playersAdded = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    if (master === players.length) {
+      master = 0;
+    }
+    let newRound = data;
+    if (newRound) {
+      newRound = false;
+      // new round
+      await Black.findAll({
+        order: [[Sequelize.literal("RAND()")]],
+        limit: 1
+      })
+        .then(async black => {
+          await black[0]
+            .update({ free: 0 })
+            .then()
+            .catch(err => {
+              console.log(err);
+            });
+          currentBlack = black[0].dataValues;
+          numberOfWhiteToAdd = currentBlack.description.split("???").length - 1;
+
+          socket.emit("newRound", {
+            numberOfWhiteToAdd,
+            currentBlack,
+            master: players[master]
+          });
+          socket.broadcast.emit("newRound", {
+            numberOfWhiteToAdd,
+            currentBlack,
+            master: players[master]
+          });
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    }
+  });
+
   socket.on("refreshReq", data => {
     if (gameStarted) {
       socket.emit("gameStarted", true);
@@ -267,15 +266,27 @@ io.on("connection", socket => {
         currentBlack,
         choosenWhite,
         winPoints,
-        playersAdded
+        playersAdded,
+        numberOfWhiteToAdd
       });
     }
   });
   socket.on("gameFinish", data => {
     console.log(data);
   });
+  socket.on("disconnect", () => {
+    console.log(`${socket.id} is disconected!`);
+  });
 });
 
+// Helper functions
+
+const addPlayers = async users => {
+  for (let i = 0; i < users.length; i++) {
+    players.push(users[i].dataValues);
+  }
+  shuffle(players);
+};
 // shuffle function - randomize succession
 function shuffle(array) {
   var currentIndex = array.length,
@@ -298,101 +309,87 @@ function shuffle(array) {
 }
 
 async function newGameSetUp(numberOfCards) {
-  connection.query(
-    "SELECT id,login,succession FROM users WHERE succession > 0",
-    (err, resLogin, fields) => {
-      if (err) {
-        console.log(err);
-      }
-
-      // for each user
-      for (let j = 0; j < resLogin.length; j++) {
-        setTimeout(() => {
-          connection.query(
-            "SELECT * FROM whitecards WHERE free = ?  ORDER BY RAND() LIMIT ?",
-            [1, numberOfCards],
-            (err, resCards, fields) => {
-              if (err) {
-                console.log(err);
-              }
-
-              for (let i = 0; i < resCards.length; i++) {
-                connection.query(
-                  "UPDATE whitecards SET free = ? WHERE id = ?",
-                  [0, resCards[i].id],
-                  (err, res) => {
-                    if (err) {
-                      console.log(err);
-                    }
-                  }
-                );
-
-                connection.query(
-                  "INSERT INTO distribution (login,whitecard) VALUES ( ? , ? )",
-                  [resLogin[j].id, resCards[i].id],
-                  (err, res) => {
-                    if (err) {
-                      console.log(err);
-                    }
-                  }
-                );
-              }
+  await User.findAll({ where: { succession: { [Op.gt]: 0 } } }).then(
+    async users => {
+      for (let i = 0; i < users.length; i++) {
+        await White.findAll({
+          order: [[Sequelize.literal("RAND()")]],
+          limit: numberOfCards
+        })
+          .then(async whites => {
+            for (let j = 0; j < whites.length; j++) {
+              await whites[j]
+                .update({ free: 0 })
+                .then()
+                .catch(err => {
+                  console.log(err);
+                });
+              await Distribution.create({
+                login: users[i].id,
+                whiteCard: whites[j].id
+              })
+                .then()
+                .catch(err => {
+                  console.log(err);
+                });
             }
-          );
-        }, 100 * j);
+          })
+          .catch(err => {
+            console.log(err);
+          });
       }
     }
   );
 }
 
-// helper
-const resetWhiteCards = () => {
-  connection.query(
-    "UPDATE whitecards SET free = ?",
-    [1],
-    (err, res, fields) => {
-      if (err) {
-        console.log(err);
-      }
-    }
-  );
-};
-const clearDistribution = () => {
-  connection.query("DELETE FROM distribution", (err, res, fields) => {
-    if (err) {
-      console.log(err);
+const resetWhiteCards = async () => {
+  await White.findAll({ where: { free: 0 } }).then(white => {
+    for (let i = 0; i < white.length; i++) {
+      white[i].update({ free: 1 });
     }
   });
 };
 
-const resetBlackCards = () => {
-  connection.query(
-    "UPDATE blackcards SET free = ?",
-    [1],
-    (err, res, fields) => {
-      if (err) {
-        console.log(err);
+const clearDistribution = async () => {
+  await Distribution.findAll()
+    .then(distributions => {
+      for (let i = 0; i < distributions.length; i++) {
+        distributions[i].destroy();
       }
-    }
-  );
+    })
+    .catch(err => console.log(err));
 };
 
-const resetUserPoints = login => {
-  if (login === undefined) {
-    connection.query("UPDATE users SET points=?", [0], (err, res, fields) => {
-      if (err) {
+const resetBlackCards = async () => {
+  await Black.findAll({ where: { free: 0 } }).then(blacks => {
+    for (let i = 0; i < blacks.length; i++) {
+      blacks[i].update({ free: 1 });
+    }
+  });
+};
+
+const resetUserPoints = async login => {
+  if (login !== undefined) {
+    await User.findOne({ where: { login } })
+      .then(user => {
+        user.update({ points: 0 });
+      })
+      .catch(err => {
         console.log(err);
-      }
-    });
+      });
   } else {
-    connection.query(
-      "UPDATE users SET points = ? WHERE login = ?",
-      [0, login],
-      (err, res, fields) => {
-        if (err) {
-          console.log(err);
+    await User.findAll()
+      .then(users => {
+        for (let i = 0; i < users.length; i++) {
+          users[i].update({ points: 0 });
         }
-      }
-    );
+      })
+      .catch(err => console.log(err));
   }
+};
+
+const finishSetup = async (setup, time) => {
+  setTimeout(() => {
+    console.log(setup);
+  }, 1000 * time);
 };

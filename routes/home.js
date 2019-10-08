@@ -1,7 +1,5 @@
 const express = require("express");
 const home = express.Router();
-var path = require("path");
-//DB connection
 const connection = require("../config/mysql-connection");
 
 //routing
@@ -26,17 +24,18 @@ home.get("/newGame", (req, res, next) => {
 home.post("/newGame", (req, res, next) => {
   if (req.session.loggedin) {
     res.redirect("/home");
+    res.end();
   } else {
     res.send("Please login to view this page!");
+    res.end();
   }
-  res.end();
 });
 
-home.get("/logout", (req, res, next) => {
+home.get("/logout", async (req, res, next) => {
   // destroying session === clear succession && clear points
   if (req.session.loggedin) {
-    clearSuccession(req.session.login);
-    resetUserPoints(req.session.login);
+    // await clearSuccession(req.session.login);
+    await resetUserPoints(req.session.login);
 
     req.session.destroy(err => {
       if (err) {
@@ -52,7 +51,7 @@ module.exports = home;
 // helper functions
 
 const resetUserPoints = login => {
-  if (login === undefined) {
+  if (login !== undefined) {
     connection.query("UPDATE users SET points=?", [0], (err, res, fields) => {
       if (err) {
         console.log(err);

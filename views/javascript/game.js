@@ -1,4 +1,4 @@
-const socket = io({ transports: ["websocket"], upgrade: false });
+const socket = io(); // { transports: ["websocket"], upgrade: false }
 
 const blackCard = document.getElementById("blackCard");
 const allWhiteCards = document.getElementById("allWhiteCards");
@@ -18,12 +18,17 @@ let points;
 let added = false;
 let ready = false;
 let gameStarted = false;
+let numberOfWhiteToAdd = 0;
+let numberAlreadyAdded = 0;
+let newRound = false;
+let choosenWhite = [];
 
 socket.on("winPoints", data => {
   boardCards = [];
   points = data;
   ready = false;
   added = false;
+  numberAlreadyAdded = 0;
 });
 
 // redirect
@@ -44,10 +49,12 @@ if (window.performance) {
         if (data.playersAdded[id - 1] === 1) {
           added = true;
         }
+
         points = data.winPoints;
         master = data.master;
         masterId = master.id;
         players = data.players;
+        numberOfWhiteToAdd = data.numberOfWhiteToAdd;
         myCards = [];
         myCards.push(data.playersCards[id - 1]);
         while (allYourCards.firstChild) {
@@ -55,7 +62,7 @@ if (window.performance) {
         }
         let markup = "";
         for (let i = 0; i < myCards[0].length; i++) {
-          markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i]}</div>`;
+          markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i].description}</div>`;
         }
         allYourCards.insertAdjacentHTML("afterbegin", markup);
         markup = "";
@@ -76,15 +83,21 @@ if (window.performance) {
         markup = "";
         markup += `<div class="card-body black">
                       <p class="card-text">
-                      ${data.currentBlack[0].description}
+                      ${data.currentBlack.description}
                       </p>
                     </div>`;
         blackCard.insertAdjacentHTML("afterbegin", markup);
         markup = "";
         boardCards = data.choosenWhite;
 
+        markup = "";
+
         for (let i = 0; i < boardCards.length; i++) {
-          markup += `<div class="col-sm card border border-dark m-2 white">${boardCards[i].card}</div>`;
+          markup += "<div class='col'>";
+          for (let j = 0; j < boardCards[i].length; j++) {
+            markup += `<div class="card border border-dark m-2 white">${boardCards[i][j][0].description}</div>`;
+          }
+          markup += "</div>";
         }
         allWhiteCards.insertAdjacentHTML("afterbegin", markup);
       });
@@ -93,18 +106,24 @@ if (window.performance) {
 }
 
 socket.on("firstDeal", data => {
+  boardCards = [];
+  numberAlreadyAdded = 0;
   gameStarted = true;
   master = data.master;
   masterId = master.id;
   players = data.players;
+  numberOfWhiteToAdd = data.numberOfWhiteToAdd;
   myCards = [];
   myCards.push(data.playersCards[id - 1]);
+  while (allWhiteCards.firstChild) {
+    allWhiteCards.removeChild(allWhiteCards.firstChild);
+  }
   while (allYourCards.firstChild) {
     allYourCards.removeChild(allYourCards.firstChild);
   }
   let markup = "";
   for (let i = 0; i < myCards[0].length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i]}</div>`;
+    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i].description}</div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
   markup = "";
@@ -125,7 +144,7 @@ socket.on("firstBlack", data => {
   let markup = ``;
   markup += `<div class="card-body black">
                 <p class="card-text">
-                ${data[0].description}
+                ${data.description}
                 </p>
               </div>`;
   blackCard.insertAdjacentHTML("afterbegin", markup);
@@ -137,46 +156,115 @@ allYourCards.addEventListener("click", e => {
   e.preventDefault();
   if (masterId !== id) {
     if (!added) {
-      added = true;
       let card = e.target.closest("div");
+
       if (card.innerHTML[0] !== "<") {
         card.parentNode.removeChild(card);
+        numberAlreadyAdded++;
         socket.emit("putWhiteCard", { card: card.innerHTML, id });
+      }
+      if (numberAlreadyAdded === numberOfWhiteToAdd) {
+        added = true;
+      } else {
+        added = false;
       }
     }
   }
 });
+
 allWhiteCards.addEventListener("click", e => {
   e.preventDefault();
+  let num = 0;
 
-  ready = allWhiteCards.childElementCount === players.length - 1;
+  for (let i = 0; i < boardCards.length; i++) {
+    num += boardCards[i].length;
+  }
+
+  if ((players.length - 1) * numberOfWhiteToAdd === num) {
+    ready = true;
+  }
 
   if (masterId === id) {
     if (ready) {
-      ready = false;
       let card = e.target.closest("div");
       if (card.innerHTML[0] !== "<") {
+        ready = false;
         socket.emit("whiteChoose", { card: card.innerHTML });
       }
     }
   }
 });
 
+socket.on("whiteChoose", data => {
+  newRound = true;
+  choosenWhite = data[0];
+  while (allWhiteCards.firstChild) {
+    allWhiteCards.removeChild(allWhiteCards.firstChild);
+  }
+
+  for (let i = 0; i < boardCards.length; i++) {
+    for (let j = 0; j < boardCards[i].length; j++) {
+      if (choosenWhite[0].description === boardCards[i][j][0].description) {
+        boardCards = [[], [], [], [], [], [], [], [], []];
+        boardCards[i].push(choosenWhite[0]);
+        break;
+      }
+    }
+  }
+
+  let markup = "";
+
+  for (let i = 0; i < boardCards.length; i++) {
+    markup += "<div class='col'>";
+    for (let j = 0; j < boardCards[i].length; j++) {
+      markup += `<div class="card border border-dark m-2 black">${boardCards[i][j].description}</div>`;
+    }
+    markup += "</div>";
+  }
+  allWhiteCards.insertAdjacentHTML("afterbegin", markup);
+
+  if (id === masterId) {
+    console.log(newRound);
+    if (newRound) {
+      console.log(2);
+      const interval = setInterval(() => {
+        console.log(3);
+        if (!newRound) {
+          console.log(4);
+          socket.emit("new", true);
+          clearInterval(interval);
+        }
+        window.addEventListener("click", e => {
+          e.preventDefault();
+          newRound = false;
+        });
+      }, 100);
+    }
+  }
+});
+
 // common board
 socket.on("allWhite", data => {
-  let markup = ``;
-  markup += `<div class="col-sm card border border-dark m-2 white">${data}</div>`;
+  boardCards = data;
+  let markup = "";
+  for (let i = 0; i < data.length; i++) {
+    markup += "<div class='col'>";
+    for (let j = 0; j < data[i].length; j++) {
+      markup += `<div class="card border border-dark m-2 white">${data[i][j][0].description}</div>`;
+    }
+    markup += "</div>";
+  }
   allWhiteCards.insertAdjacentHTML("afterbegin", markup);
 });
 // newWhiteDeal
 socket.on("newWhiteDeal", data => {
-  myCards = data;
+  myCards = data[id - 1];
   while (allYourCards.firstChild) {
     allYourCards.removeChild(allYourCards.firstChild);
   }
   let markup = "";
   for (let i = 0; i < myCards.length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[i]}</div>`;
+    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[i].description}</div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
 });
@@ -194,6 +282,10 @@ socket.on("playersPoints", data => {
 });
 
 socket.on("newRound", data => {
+  newRound = false;
+  boardCards = [];
+  numberOfWhiteToAdd = data.numberOfWhiteToAdd;
+  numberAlreadyAdded = 0;
   added = false;
   master = data.master;
   masterId = data.master.id;
@@ -206,7 +298,7 @@ socket.on("newRound", data => {
   let markup = ``;
   markup += `<div class="card-body black">
                 <p class="card-text">
-                ${data.res[0].description}
+                ${data.currentBlack.description}
                 </p>
               </div>`;
   blackCard.insertAdjacentHTML("afterbegin", markup);
