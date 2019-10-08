@@ -12,26 +12,25 @@ login.post("/", (req, res, next) => {
   const password = req.body.password;
   if (login && password) {
     User.findOne({ where: { login, password } })
-      .then(user => {
+      .then(async user => {
         if (user) {
           const id = user.id;
           req.session.loggedin = true;
           req.session.login = login;
           req.session.ids = id;
-          Succession.findOne({ where: { captured: 0 } })
+          await Succession.findOne({ where: { captured: 0 } })
             .then(async succession => {
               if (succession) {
-                // uncomment on prod mod
-                // await User.findOne({ where: { login } })
-                //   .then(user => {
-                //     if (user) {
-                //       user.update({
-                //         succession: succession[0].id
-                //       });
-                //     }
-                //   })
-                //   .catch(err => console.log(err));
-                // succession[0].update({ captured: 1 });
+                await User.findOne({ where: { login, password } })
+                  .then(user => {
+                    if (user) {
+                      user.update({
+                        succession: succession.id
+                      });
+                    }
+                  })
+                  .catch(err => console.log(err));
+                succession.update({ captured: 1 });
 
                 res.redirect("/home");
               } else {

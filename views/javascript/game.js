@@ -123,7 +123,10 @@ socket.on("firstDeal", data => {
   }
   let markup = "";
   for (let i = 0; i < myCards[0].length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[0][i].description}</div>`;
+    if (i % 2 === 0) {
+      markup += `<div class="w-100"></div>;`;
+    }
+    markup += `<div class="col card border border-dark m-2 white">${myCards[0][i].description}</div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
   markup = "";
@@ -224,13 +227,9 @@ socket.on("whiteChoose", data => {
   allWhiteCards.insertAdjacentHTML("afterbegin", markup);
 
   if (id === masterId) {
-    console.log(newRound);
     if (newRound) {
-      console.log(2);
       const interval = setInterval(() => {
-        console.log(3);
         if (!newRound) {
-          console.log(4);
           socket.emit("new", true);
           clearInterval(interval);
         }
@@ -264,7 +263,10 @@ socket.on("newWhiteDeal", data => {
   }
   let markup = "";
   for (let i = 0; i < myCards.length; i++) {
-    markup += `<div class="col-sm card border border-dark m-2 white">${myCards[i].description}</div>`;
+    if (i % 2 === 0) {
+      markup += `<div class="w-100"></div>;`;
+    }
+    markup += `<div class="col card border border-dark m-2 white">${myCards[i].description}</div>`;
   }
   allYourCards.insertAdjacentHTML("afterbegin", markup);
 });

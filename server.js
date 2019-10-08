@@ -388,8 +388,3 @@ const resetUserPoints = async login => {
   }
 };
 
-const finishSetup = async (setup, time) => {
-  setTimeout(() => {
-    console.log(setup);
-  }, 1000 * time);
-};

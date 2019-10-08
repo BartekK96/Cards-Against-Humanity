@@ -1,6 +1,8 @@
 const express = require("express");
 const home = express.Router();
-const connection = require("../config/mysql-connection");
+
+const User = require("../models/User");
+const Succession = require("../models/Succession");
 
 //routing
 home.get("/", (req, res, next) => {
@@ -34,7 +36,7 @@ home.post("/newGame", (req, res, next) => {
 home.get("/logout", async (req, res, next) => {
   // destroying session === clear succession && clear points
   if (req.session.loggedin) {
-    // await clearSuccession(req.session.login);
+    await clearSuccession(req.session.login);
     await resetUserPoints(req.session.login);
 
     req.session.destroy(err => {
@@ -49,62 +51,51 @@ home.get("/logout", async (req, res, next) => {
 module.exports = home;
 
 // helper functions
-// need to add sequelize
+
 const resetUserPoints = async login => {
   if (login !== undefined) {
-    connection.query("UPDATE users SET points=?", [0], (err, res, fields) => {
-      if (err) {
+    await User.findOne({ where: { login } })
+      .then(user => {
+        user.update({ points: 0 });
+      })
+      .catch(err => {
         console.log(err);
-      }
-    });
+      });
   } else {
-    connection.query(
-      "UPDATE users SET points = ? WHERE login = ?",
-      [0, login],
-      (err, res, fields) => {
-        if (err) {
-          console.log(err);
+    await User.findAll()
+      .then(users => {
+        for (let i = 0; i < users.length; i++) {
+          users[i].update({ points: 0 });
         }
-      }
-    );
+      })
+      .catch(err => console.log(err));
   }
 };
 
 const clearSuccession = async login => {
-  let id;
-  connection.query(
-    "SELECT * FROM users WHERE login = ?",
-    [login],
-    (err, res) => {
-      if (err) {
-        console.log(err);
-      }
-      id = res[0].succession;
-    }
-  );
-  const interval = setInterval(() => {
-    if (id !== undefined) {
-      clearInterval(interval);
+  await User.findOne({ where: { login } })
+    .then(async user => {
+      await Succession.findOne({ where: { id: user.succession } })
+        .then(async succession => {
+          await succession
+            .update({ captured: 0 })
+            .then()
+            .catch(err => {
+              console.log(err);
+            });
+        })
+        .catch(err => {
+          console.log(err);
+        });
 
-      connection.query(
-        "UPDATE succession SET captured = ? WHERE id = ?",
-        [0, id],
-        (err, res) => {
-          if (err) {
-            console.log(err);
-          }
-        }
-      );
-    }
-  }, 10);
-
-  connection.query(
-    "UPDATE users SET succession = ? WHERE login = ?",
-    [0, login],
-    (err, res, fields) => {
-      if (err) {
-        console.log(err);
-      }
-    }
-  );
+      await user
+        .update({ succession: 0 })
+        .then()
+        .catch(err => {
+          console.log(err);
+        });
+    })
+    .catch(err => {
+      console.log(err);
+    });
 };
